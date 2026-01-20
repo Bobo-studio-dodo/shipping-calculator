@@ -1,206 +1,268 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>波波運費計算器</title>
+    <title>Bobo Studio 二補計價器</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background-color: #f4f4f4;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-        }
-        .container {
-            max-width: 500px;
-            width: 100%;
-            padding: 30px;
-            background: white;
-            border-radius: 10px;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-            text-align: center;
-        }
-        h2 {
-            color: #333;
-        }
-        label {
-            display: block;
-            margin-top: 10px;
-            font-weight: bold;
-            text-align: left;
-        }
-        input {
-            width: 100%;
-            padding: 12px;
-            margin-top: 5px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            font-size: 1.1rem;
-        }
-        button {
-            width: 100%;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            padding: 12px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 1.1rem;
-            margin-top: 15px;
-        }
-        button:hover {
-            background-color: #0056b3;
-        }
-        .selected {
-            background-color: #28a745 !important;
-            color: white;
-        }
-        #results {
-            margin-top: 20px;
-            padding: 15px;
-            background: #e9ecef;
-            border-radius: 5px;
-            text-align: left;
-            font-size: 1.1rem;
-        }
-        .toggle-buttons {
-            display: flex;
-            gap: 10px;
-            margin-top: 5px;
-        }
-        .toggle-buttons button {
-            flex: 1;
-            background-color: #ccc;
-            color: black;
-        }
-        #copyableText {
-            display: none;
-            background: #f4f4f4;
-            padding: 10px;
-            border: 1px solid #ccc;
-            margin-top: 10px;
-            text-align: left;
-            cursor: pointer;
-            white-space: pre-line;
-        }
+        body { font-family: "Microsoft JhengHei", sans-serif; max-width: 900px; margin: 2rem auto; padding: 0 1rem; background-color: #f4f4f9; color: #333; }
+        .container { background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        h2 { text-align: center; color: #444; margin-bottom: 1.5rem; }
+        
+        .section { margin-bottom: 1.5rem; padding: 1rem; border: 1px solid #eee; border-radius: 8px; background-color: #fafafa; }
+        
+        /* 智慧識別區樣式 */
+        .smart-parse-area { border: 2px dashed #6f42c1; background-color: #f8f3ff; }
+        .smart-parse-area h3 { color: #6f42c1; display: flex; align-items: center; gap: 10px; }
+        .smart-btn { background-color: #6f42c1; color: white; width: 100%; margin-top: 10px; }
+        .smart-btn:hover { background-color: #5a32a3; }
+
+        .form-row { display: flex; gap: 10px; margin-bottom: 10px; }
+        .form-group { flex: 1; }
+        label { display: block; margin-bottom: 0.5rem; font-weight: bold; font-size: 0.9rem; }
+        input, textarea { width: 100%; padding: 0.8rem; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 1rem; }
+        textarea { resize: vertical; height: 60px; font-family: monospace; }
+        
+        button { padding: 0.8rem 1.5rem; border: none; border-radius: 6px; font-size: 1rem; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        .btn-primary { background-color: #007bff; color: white; width: 100%; }
+        .btn-primary:hover { background-color: #0056b3; }
+        .btn-success { background-color: #28a745; color: white; width: 100%; }
+        .btn-danger { background-color: #dc3545; color: white; padding: 5px 10px; font-size: 0.8rem; }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 1rem; font-size: 0.9rem; }
+        th, td { padding: 8px; border-bottom: 1px solid #ddd; text-align: left; }
+        th { background-color: #f1f1f1; white-space: nowrap; }
+        
+        #clipboardArea { position: absolute; left: -9999px; }
+        .note { font-size: 0.85rem; color: #888; margin-top: 5px; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h2>運費計算器</h2>
-        <label for="n">總人頭數:</label>
-        <input type="number" id="n" min="1" value="1">
-        
-        <label for="y">每公斤金額:</label>
-        <input type="number" id="y" step="0.01" min="0">
-        
-        <button onclick="startCalculation()">開始輸入包裹</button>
-        
-        <div id="packageInput" style="display: none;">
-            <label id="progressLabel" for="x">包裹重量:</label>
-            <input type="text" id="x" placeholder="可輸入數學計算，例如 50 20">
-            
-            <label>是否代收:</label>
-            <div class="toggle-buttons">
-                <button id="btnYes" onclick="selectCOD(1)">是</button>
-                <button id="btnNo" onclick="selectCOD(0)">否</button>
+
+<div class="container">
+    <h2>📦 二補計價器</h2>
+    
+    <div class="section">
+        <div class="form-row">
+            <div class="form-group">
+                <label>每公斤單價 (TWD)</label>
+                <input type="number" id="pricePerKg" value="68">
             </div>
-            
-            <button onclick="calculate()">計算</button>
+             <div class="form-group">
+                <label>本批次名稱 (Sheet用)</label>
+                <input type="text" id="batchName" placeholder="例如：1月第2批">
+            </div>
+        </div>
+    </div>
+
+    <div class="section smart-parse-area">
+        <h3>🪄 智慧貼上區</h3>
+        <p class="note" style="margin-bottom: 10px;">直接貼上整段訊息 (包含Email、編號、重量)，系統會自動抓取填入下方欄位。</p>
+        <textarea id="smartInput" placeholder="例如：
+會員：B001 小明
+信箱：ming@gmail.com
+包裹：0.5 1.2
+備註：易碎品" style="height: 100px;"></textarea>
+        <button class="smart-btn" onclick="parseSmartInput()">⬇️ 自動識別並填入下方</button>
+    </div>
+
+    <div class="section" style="background-color: #eef6ff; border-color: #b8daff;">
+        <h3>➕ 確認與新增包裹</h3>
+        <div class="form-row">
+            <div class="form-group" style="flex: 0.5;">
+                <label>會員編號</label>
+                <input type="text" id="memberId" placeholder="自動識別">
+            </div>
+            <div class="form-group">
+                <label>會員 Gmail</label>
+                <input type="email" id="memberEmail" placeholder="自動識別">
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label>包裹重量 (空白鍵分隔)</label>
+            <textarea id="weightInput" placeholder="例如：0.25 0.75"></textarea>
         </div>
 
-        <h3>結果:</h3>
-        <div id="results"></div>
+        <div class="form-group">
+            <label>備註</label>
+            <input type="text" id="manualNote" placeholder="手動輸入或自動識別">
+        </div>
 
-        <button onclick="generateCopyableText()">生成 Excel 格式</button>
-        <pre id="copyableText" onclick="copyToClipboard()">點擊複製數據</pre>
+        <button class="btn-primary" onclick="addToList()">加入清單</button>
     </div>
-    
-    <script>
-        let currentIndex = 0;
-        let totalPeople = 0;
-        let costPerKg = 0;
-        let selectedCOD = 0;
-        let costResults = [];
 
-        function startCalculation() {
-            totalPeople = parseInt(document.querySelector('#n').value);
-            costPerKg = parseFloat(document.querySelector('#y').value);
-            
-            if (isNaN(totalPeople) || isNaN(costPerKg) || totalPeople <= 0 || costPerKg < 0) {
-                alert("請輸入有效的數值");
-                return;
+    <div class="section">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h3>📋 待複製清單</h3>
+            <button class="btn-danger" onclick="clearList()">清空列表</button>
+        </div>
+        
+        <table id="resultTable">
+            <thead>
+                <tr>
+                    <th>編號</th>
+                    <th>Gmail</th>
+                    <th>件數/重量</th>
+                    <th>備註</th>
+                    <th>總金額</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody id="listBody"></tbody>
+        </table>
+        
+        <br>
+        <button class="btn-success" onclick="copyExcelFormat()">複製 Excel 格式</button>
+        <p class="note" style="text-align: center;">點擊後，請去 Google Sheet 的「A欄」貼上 (Ctrl+V)</p>
+    </div>
+</div>
+
+<textarea id="clipboardArea"></textarea>
+
+<script>
+    let dataList = [];
+
+    // --- ✨ 智慧識別邏輯 ---
+    function parseSmartInput() {
+        let text = document.getElementById('smartInput').value;
+        if (!text) return;
+
+        // 1. 優先抓取 Email (抓到後填入，並暫時將其從文字中移除，避免干擾數字判斷)
+        const emailMatch = text.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+)/);
+        if (emailMatch) {
+            document.getElementById('memberEmail').value = emailMatch[0];
+            // 把 Email 替換成空白，避免裡面的數字被誤判
+            text = text.replace(emailMatch[0], " "); 
+        }
+
+        // 2. 抓取重量 (邏輯不變：抓取小數點數字)
+        // 排除掉可能是日期的格式，抓取 "數字.數字"
+        const weightMatches = text.match(/\d+\.\d+/g);
+        if (weightMatches) {
+            document.getElementById('weightInput').value = weightMatches.join(' ');
+            // 把重量也替換掉，避免干擾
+            weightMatches.forEach(w => {
+                text = text.replace(w, " ");
+            });
+        }
+
+        // 3. 抓取會員編號 (修正重點！)
+        // 邏輯：抓取 "獨立的 4 位數字" (前後是空白、換行或中文，不能連著英文或符號)
+        // \b 代表邊界，確保它不是 0912345678 的一部分
+        const idMatch = text.match(/(?<!\d)\d{4}(?!\d)/);
+        
+        if (idMatch) {
+            document.getElementById('memberId').value = idMatch[0];
+        } else {
+            // 如果沒抓到 4 位數，試著抓取 B 開頭的 (保留舊邏輯以防萬一)
+            const oldIdMatch = text.match(/[A-Za-z]\d{3,4}/);
+            if (oldIdMatch) {
+                document.getElementById('memberId').value = oldIdMatch[0].toUpperCase();
             }
-            
-            currentIndex = 0;
-            costResults = [];
-            document.querySelector('#results').innerHTML = ''; 
-            document.querySelector('#packageInput').style.display = 'block';
-            updateProgress();
         }
 
-        function calculate() {
-            if (currentIndex >= totalPeople) return;
-
-            let weightInput = document.querySelector('#x').value.trim();
-            let weight = safeEvaluate(weightInput);
-            if (isNaN(weight) || weight < 0) {
-                alert("請輸入有效的數值");
-                return;
-            }
-
-            let extraCharge = (weight >= 0.5) ? (selectedCOD === 1 ? 20 : 0) : 0;
-            let baseCharge = weight < 0.5 ? Math.ceil(costPerKg / 2) :
-                             weight <= 1.5 ? Math.ceil(weight * costPerKg + 5) :
-                             Math.ceil(weight * costPerKg + 10);
-
-            let finalCost = baseCharge + extraCharge;
-            costResults.push(finalCost);
-            document.querySelector('#results').innerHTML += `<p>包裹 ${currentIndex + 1} 最終收費: ${finalCost} 元</p>`;
-
-            currentIndex++;
-            
-            if (currentIndex >= totalPeople) {
-                document.querySelector('#packageInput').style.display = 'none';
-                alert("所有包裹計算完成！");
-            } else {
-                document.querySelector('#x').value = '';
-                updateProgress();
-            }
+        // 4. 抓取備註
+        const noteMatch = text.match(/(?:備註|Note)[:：]\s*(.*)/i);
+        if (noteMatch) {
+            document.getElementById('manualNote').value = noteMatch[1].trim();
         }
+    }
 
-        function updateProgress() {
-            document.querySelector('#progressLabel').textContent = `正在輸入第 ${currentIndex + 1} 個包裹，共 ${totalPeople} 個`;
-        }
+    // --- 原本的計算邏輯 ---
 
-        function safeEvaluate(expression) {
-            expression = expression.replace(/\s+/g, '+');
-            try {
-                return new Function(`return ${expression}`)();
-            } catch {
-                return NaN;
-            }
-        }
+    function addToList() {
+        const mId = document.getElementById('memberId').value.trim() || '-';
+        const email = document.getElementById('memberEmail').value.trim() || '-';
+        const manualNote = document.getElementById('manualNote').value.trim() || ''; 
+        
+        const pricePerKg = parseFloat(document.getElementById('pricePerKg').value) || 0;
+        const weightStr = document.getElementById('weightInput').value.trim();
+        const batch = document.getElementById('batchName').value.trim() || getTimeString();
 
-        function generateCopyableText() {
-            document.querySelector("#copyableText").textContent = costResults.join("\n");
-            document.querySelector("#copyableText").style.display = "block";
-        }
+        if (!weightStr) { alert("請輸入或貼上重量！"); return; }
 
-        function copyToClipboard() {
-            navigator.clipboard.writeText(document.querySelector("#copyableText").textContent)
-                .then(() => alert("已複製到剪貼簿！"));
-        }
+        const weights = weightStr.split(/\s+/).map(num => parseFloat(num)).filter(n => !isNaN(n));
+        if (weights.length === 0) { alert("重量格式錯誤"); return; }
 
-        function selectCOD(value) {
-            selectedCOD = value;
-            document.querySelector("#btnYes").classList.toggle("selected", value === 1);
-            document.querySelector("#btnNo").classList.toggle("selected", value === 0);
-        }
-    </script>
+        const count = weights.length;
+        const actualWeight = weights.reduce((a, b) => a + b, 0);
+        const chargeableWeight = actualWeight < 0.5 ? 0.5 : actualWeight;
+        
+        const shippingFee = Math.ceil(chargeableWeight * pricePerKg);
+        const collectionFee = count * 10;
+        let packagingFee = (count === 1) ? 10 : (count * 8);
+        const totalCost = shippingFee + collectionFee + packagingFee;
+        
+        const autoDetail = `運${shippingFee}/代${collectionFee}/包${packagingFee}`;
+
+        dataList.push({
+            batch: batch,
+            id: mId,
+            email: email,
+            count: count,
+            weight: chargeableWeight.toFixed(2),
+            autoDetail: autoDetail,
+            manualNote: manualNote,
+            total: Math.ceil(totalCost)
+        });
+
+        renderTable();
+        
+        // 清空輸入框 (保留批次)
+        // 清空智慧貼上區
+        document.getElementById('smartInput').value = '';
+        document.getElementById('weightInput').value = '';
+        document.getElementById('manualNote').value = '';
+        document.getElementById('memberId').value = ''; 
+        document.getElementById('memberEmail').value = ''; 
+        document.getElementById('smartInput').focus();
+    }
+
+    function renderTable() {
+        const tbody = document.getElementById('listBody');
+        tbody.innerHTML = '';
+        dataList.forEach((item, index) => {
+            tbody.innerHTML += `
+                <tr>
+                    <td>${item.id}</td>
+                    <td><small>${item.email}</small></td>
+                    <td>${item.count}件 / ${item.weight}kg</td>
+                    <td style="color:#666; font-size:0.85em;">${item.manualNote}</td>
+                    <td style="color:#d63384;font-weight:bold">${item.total}</td>
+                    <td><button class="btn-danger" onclick="removeRow(${index})">X</button></td>
+                </tr>`;
+        });
+    }
+
+    function removeRow(index) {
+        dataList.splice(index, 1);
+        renderTable();
+    }
+
+    function clearList() {
+        if(confirm("確定清空清單？")) { dataList = []; renderTable(); }
+    }
+
+    function getTimeString() {
+        const d = new Date();
+        return `${d.getMonth()+1}/${d.getDate()}`;
+    }
+
+    function copyExcelFormat() {
+        if (dataList.length === 0) { alert("沒資料！"); return; }
+
+        let text = "";
+        dataList.forEach(item => {
+            text += `${item.batch}\t${item.id}\t${item.email}\t${item.count}\t${item.weight}\t${item.autoDetail}\t${item.manualNote}\t${item.total}\n`;
+        });
+
+        const ta = document.getElementById('clipboardArea');
+        ta.value = text;
+        ta.select();
+        document.execCommand('copy');
+        alert(`已複製 ${dataList.length} 筆資料！\n請確認 Google Sheet 欄位順序正確後貼上。`);
+    }
+</script>
 </body>
 </html>
