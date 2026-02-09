@@ -20,7 +20,7 @@
         .form-row { display: flex; gap: 10px; margin-bottom: 10px; }
         .form-group { flex: 1; }
         label { display: block; margin-bottom: 0.5rem; font-weight: bold; font-size: 0.9rem; }
-        input, textarea { width: 100%; padding: 0.8rem; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 1rem; }
+        input, textarea, select { width: 100%; padding: 0.8rem; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 1rem; }
         textarea { resize: vertical; height: 60px; font-family: monospace; }
         
         button { padding: 0.8rem 1.5rem; border: none; border-radius: 6px; font-size: 1rem; cursor: pointer; font-weight: bold; transition: 0.2s; }
@@ -35,12 +35,15 @@
         
         #clipboardArea { position: absolute; left: -9999px; }
         .note { font-size: 0.85rem; color: #888; margin-top: 5px; }
+        
+        /* 新增：包裹數量顯示 */
+        #pkgCountDisplay { color: #d63384; font-weight: bold; margin-top: 5px; display: block; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2>📦 二補計價器</h2>
+    <h2>📦 二補計價器 (打包分離版)</h2>
     
     <div class="section">
         <div class="form-row">
@@ -48,7 +51,7 @@
                 <label>每公斤單價 (TWD)</label>
                 <input type="number" id="pricePerKg" value="68">
             </div>
-             <div class="form-group">
+            <div class="form-group">
                 <label>本批次名稱 (Sheet用)</label>
                 <input type="text" id="batchName" placeholder="例如：1月第2批">
             </div>
@@ -58,7 +61,8 @@
     <div class="section smart-parse-area">
         <h3>🪄 智慧貼上區</h3>
         <p class="note" style="margin-bottom: 10px;">直接貼上整段訊息 (包含Email、編號、重量)，系統會自動抓取填入下方欄位。</p>
-        <textarea id="smartInput" placeholder="例如：
+        <textarea id="smartInput" 
+placeholder="例如：
 會員：B001 小明
 信箱：ming@gmail.com
 包裹：0.5 1.2
@@ -80,8 +84,20 @@
         </div>
         
         <div class="form-group">
-            <label>包裹重量 (空白鍵分隔)</label>
-            <textarea id="weightInput" placeholder="例如：0.25 0.75"></textarea>
+            <label>入庫包裹重量 (空白鍵分隔)</label>
+            <textarea id="weightInput" placeholder="例如：0.25 0.75" oninput="updatePkgCount()"></textarea>
+            <span id="pkgCountDisplay">目前入庫：0 件 (代收費依此計算)</span>
+        </div>
+
+        <div class="form-row" style="background: #fff; padding: 10px; border-radius: 5px; border: 1px solid #ddd;">
+            <div class="form-group">
+                <label style="color:#d63384;">📦 打包後總件數 (出貨箱數)</label>
+                <input type="number" id="packedCount" value="1" min="1" onchange="updateTotalPreview()">
+                <p class="note">1件收10元，2件以上每件8元</p>
+            </div>
+            <div class="form-group" style="display: flex; align-items: center; justify-content: flex-end;">
+                 <h4 style="margin:0; color:#007bff;" id="previewTotal">預估: 0 元</h4>
+            </div>
         </div>
 
         <div class="form-group">
@@ -103,7 +119,8 @@
                 <tr>
                     <th>編號</th>
                     <th>Gmail</th>
-                    <th>件數/重量</th>
+                    <th>入庫/出貨</th>
+                    <th>費用明細 (運/代/包)</th>
                     <th>備註</th>
                     <th>總金額</th>
                     <th>操作</th>
@@ -128,38 +145,27 @@
         let text = document.getElementById('smartInput').value;
         if (!text) return;
 
-        // 1. 優先抓取 Email (抓到後填入，並暫時將其從文字中移除，避免干擾數字判斷)
+        // 1. 抓取 Email
         const emailMatch = text.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+)/);
         if (emailMatch) {
             document.getElementById('memberEmail').value = emailMatch[0];
-            // 把 Email 替換成空白，避免裡面的數字被誤判
-            text = text.replace(emailMatch[0], " "); 
+            text = text.replace(emailMatch[0], " ");
         }
 
-        // 2. 抓取重量 (邏輯不變：抓取小數點數字)
-        // 排除掉可能是日期的格式，抓取 "數字.數字"
+        // 2. 抓取重量
         const weightMatches = text.match(/\d+\.\d+/g);
         if (weightMatches) {
             document.getElementById('weightInput').value = weightMatches.join(' ');
-            // 把重量也替換掉，避免干擾
-            weightMatches.forEach(w => {
-                text = text.replace(w, " ");
-            });
+            weightMatches.forEach(w => { text = text.replace(w, " "); });
         }
 
-        // 3. 抓取會員編號 (修正重點！)
-        // 邏輯：抓取 "獨立的 4 位數字" (前後是空白、換行或中文，不能連著英文或符號)
-        // \b 代表邊界，確保它不是 0912345678 的一部分
+        // 3. 抓取會員編號
         const idMatch = text.match(/(?<!\d)\d{4}(?!\d)/);
-        
         if (idMatch) {
             document.getElementById('memberId').value = idMatch[0];
         } else {
-            // 如果沒抓到 4 位數，試著抓取 B 開頭的 (保留舊邏輯以防萬一)
             const oldIdMatch = text.match(/[A-Za-z]\d{3,4}/);
-            if (oldIdMatch) {
-                document.getElementById('memberId').value = oldIdMatch[0].toUpperCase();
-            }
+            if (oldIdMatch) document.getElementById('memberId').value = oldIdMatch[0].toUpperCase();
         }
 
         // 4. 抓取備註
@@ -167,55 +173,113 @@
         if (noteMatch) {
             document.getElementById('manualNote').value = noteMatch[1].trim();
         }
+
+        updatePkgCount();
     }
 
-    // --- 原本的計算邏輯 ---
+    // --- 📦 即時更新顯示與預覽金額 ---
+    function updatePkgCount() {
+        const weightStr = document.getElementById('weightInput').value.trim();
+        let count = 0;
+        if (weightStr) {
+            const weights = weightStr.split(/\s+/).map(num => parseFloat(num)).filter(n => !isNaN(n));
+            count = weights.length;
+        }
+        
+        let hint = (count >= 5) ? "(代收費降為8元/件)" : "(代收費10元/件)";
+        document.getElementById('pkgCountDisplay').innerText = `目前入庫：${count} 件 ${hint}`;
+        
+        updateTotalPreview();
+    }
 
+    function updateTotalPreview() {
+        // 為了讓你在按「加入」前就能看到金額，這裡做個簡單預算
+        const fee = calculateFee(true); // true 代表是預覽模式，不彈窗
+        if(fee) {
+            document.getElementById('previewTotal').innerText = `預估: ${fee.total} 元`;
+        } else {
+            document.getElementById('previewTotal').innerText = `預估: 0 元`;
+        }
+    }
+
+    // --- 💰 計算核心 (獨立出來方便預覽用) ---
+    function calculateFee(isPreview = false) {
+        const pricePerKg = parseFloat(document.getElementById('pricePerKg').value) || 0;
+        const weightStr = document.getElementById('weightInput').value.trim();
+        const packedCount = parseInt(document.getElementById('packedCount').value) || 1;
+
+        if (!weightStr) return null;
+
+        const weights = weightStr.split(/\s+/).map(num => parseFloat(num)).filter(n => !isNaN(n));
+        if (weights.length === 0) return null;
+
+        // 1. 基礎數據
+        const inputCount = weights.length; // 入庫件數 (算代收費)
+        const actualWeight = weights.reduce((a, b) => a + b, 0);
+        const chargeableWeight = actualWeight < 0.5 ? 0.5 : actualWeight; 
+
+        // 2. 運費
+        const shippingFee = Math.ceil(chargeableWeight * pricePerKg);
+
+        // 3. 代收費 (依據入庫件數)
+        let collectionRate = (inputCount >= 5) ? 8 : 10;
+        const collectionFee = inputCount * collectionRate;
+
+        // 4. 包裝費 (依據打包後件數) 🔥 修改重點
+        let packagingFee = 0;
+        if (packedCount === 1) {
+            packagingFee = 10;
+        } else {
+            packagingFee = packedCount * 8;
+        }
+
+        const totalCost = shippingFee + collectionFee + packagingFee;
+
+        return {
+            inputCount,
+            packedCount,
+            weight: chargeableWeight.toFixed(2),
+            shippingFee,
+            collectionFee,
+            packagingFee,
+            total: Math.ceil(totalCost)
+        };
+    }
+
+    // --- 加入清單 ---
     function addToList() {
+        const result = calculateFee();
+        if (!result) { alert("請輸入重量！"); return; }
+
         const mId = document.getElementById('memberId').value.trim() || '-';
         const email = document.getElementById('memberEmail').value.trim() || '-';
         const manualNote = document.getElementById('manualNote').value.trim() || ''; 
-        
-        const pricePerKg = parseFloat(document.getElementById('pricePerKg').value) || 0;
-        const weightStr = document.getElementById('weightInput').value.trim();
         const batch = document.getElementById('batchName').value.trim() || getTimeString();
 
-        if (!weightStr) { alert("請輸入或貼上重量！"); return; }
-
-        const weights = weightStr.split(/\s+/).map(num => parseFloat(num)).filter(n => !isNaN(n));
-        if (weights.length === 0) { alert("重量格式錯誤"); return; }
-
-        const count = weights.length;
-        const actualWeight = weights.reduce((a, b) => a + b, 0);
-        const chargeableWeight = actualWeight < 0.5 ? 0.5 : actualWeight;
-        
-        const shippingFee = Math.ceil(chargeableWeight * pricePerKg);
-        const collectionFee = count * 10;
-        let packagingFee = (count === 1) ? 10 : (count * 8);
-        const totalCost = shippingFee + collectionFee + packagingFee;
-        
-        const autoDetail = `運${shippingFee}/代${collectionFee}/包${packagingFee}`;
+        const autoDetail = `運${result.shippingFee} + 代${result.collectionFee} + 包${result.packagingFee}`;
 
         dataList.push({
             batch: batch,
             id: mId,
             email: email,
-            count: count,
-            weight: chargeableWeight.toFixed(2),
-            autoDetail: autoDetail,
+            countDesc: `${result.inputCount}入 / ${result.packedCount}出`, // 顯示入庫與出貨數
+            weight: result.weight,
+            autoDetail: autoDetail, 
             manualNote: manualNote,
-            total: Math.ceil(totalCost)
+            total: result.total
         });
 
         renderTable();
-        
-        // 清空輸入框 (保留批次)
-        // 清空智慧貼上區
+
+        // 清空輸入框，但保留打包數預設為1
         document.getElementById('smartInput').value = '';
         document.getElementById('weightInput').value = '';
         document.getElementById('manualNote').value = '';
         document.getElementById('memberId').value = ''; 
         document.getElementById('memberEmail').value = ''; 
+        document.getElementById('packedCount').value = '1'; // 重置為 1
+        
+        updatePkgCount();
         document.getElementById('smartInput').focus();
     }
 
@@ -227,7 +291,8 @@
                 <tr>
                     <td>${item.id}</td>
                     <td><small>${item.email}</small></td>
-                    <td>${item.count}件 / ${item.weight}kg</td>
+                    <td>${item.countDesc}<br><small>${item.weight}kg</small></td>
+                    <td style="color:#666; font-size:0.85em;">${item.autoDetail}</td>
                     <td style="color:#666; font-size:0.85em;">${item.manualNote}</td>
                     <td style="color:#d63384;font-weight:bold">${item.total}</td>
                     <td><button class="btn-danger" onclick="removeRow(${index})">X</button></td>
@@ -254,14 +319,13 @@
 
         let text = "";
         dataList.forEach(item => {
-            text += `${item.batch}\t${item.id}\t${item.email}\t${item.count}\t${item.weight}\t${item.autoDetail}\t${item.manualNote}\t${item.total}\n`;
+            text += `${item.batch}\t${item.id}\t${item.email}\t${item.countDesc}\t${item.weight}\t${item.autoDetail}\t${item.manualNote}\t${item.total}\n`;
         });
-
         const ta = document.getElementById('clipboardArea');
         ta.value = text;
         ta.select();
         document.execCommand('copy');
-        alert(`已複製 ${dataList.length} 筆資料！\n請確認 Google Sheet 欄位順序正確後貼上。`);
+        alert(`已複製 ${dataList.length} 筆資料！`);
     }
 </script>
 </body>
